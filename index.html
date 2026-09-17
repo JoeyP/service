@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b2f59">
+<title>B&L Neeley Service Platform</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">B&L</div><div><strong>B&L Neeley</strong><span>Service Platform</span></div></div>
+    <nav>
+      <button class="nav active" data-route="dashboard">Dashboard</button>
+      <button class="nav" data-route="customers">Customers</button>
+      <button class="nav" data-route="reports">Reports</button>
+      <button class="nav" data-route="new-report">New Service Report</button>
+      <div class="nav-label">Administration</div>
+      <button class="nav" data-route="facility">Facility Setup</button>
+    </nav>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div><h1 id="pageTitle">Dashboard</h1><small id="pageSubtitle">Service program overview</small></div>
+      <button class="btn primary desktop" data-route="new-report">+ New Report</button>
+    </header>
+
+    <div class="content">
+      <section class="route active" id="dashboard">
+        <div class="pagehead"><div><h2>Service Dashboard</h2><p>Customer programs, recent visits, and current facility activity.</p></div></div>
+        <div class="kpis">
+          <div class="card kpi"><span>Active Facilities</span><strong id="kpiFacilities">3</strong></div>
+          <div class="card kpi"><span>Reports This Month</span><strong id="kpiReports">3</strong></div>
+          <div class="card kpi"><span>Stable Programs</span><strong id="kpiStable">67%</strong></div>
+          <div class="card kpi"><span>Open Drafts</span><strong id="kpiDrafts">1</strong></div>
+        </div>
+        <div class="split">
+          <div class="card panel"><div class="panelhead"><h3>Recent Reports</h3><button class="link" data-route="reports">View all</button></div><div id="recentReports"></div></div>
+          <div class="card panel"><div class="panelhead"><h3>Recent Equipment</h3></div><div id="recentEquipment"></div></div>
+        </div>
+      </section>
+
+      <section class="route" id="customers">
+        <div class="pagehead"><div><h2>Customers</h2><p>Select a customer to open its facilities and equipment.</p></div><button class="btn primary" id="addCustomer">+ Add Customer</button></div>
+        <div class="card panel"><input id="customerSearch" class="search" placeholder="Search customers or facilities..."><div id="customerList" class="list"></div></div>
+      </section>
+
+      <section class="route" id="facility">
+        <div class="pagehead"><div><h2 id="facilityTitle">Nulaid — Ripon</h2><p id="facilityMeta">Facility equipment and program setup.</p></div><button class="btn primary" id="addEquipment">+ Add Equipment</button></div>
+        <div class="tabs"><button class="tab active" data-tab="equipmentTab">Equipment</button><button class="tab" data-tab="targetsTab">Targets</button><button class="tab" data-tab="facilityReportsTab">Reports</button><button class="tab" data-tab="trendsTab">Trends</button></div>
+        <div class="tabpane active" id="equipmentTab"><div id="equipmentGrid" class="equipment-grid"></div></div>
+        <div class="tabpane" id="targetsTab"><div class="card panel"><h3>Target Profiles</h3><div id="targetsList"></div></div></div>
+        <div class="tabpane" id="facilityReportsTab"><div class="card panel"><div id="facilityReports"></div></div></div>
+        <div class="tabpane" id="trendsTab"><div class="card empty"><h3>Historical Trends</h3><p>Charts will use the structured report readings stored in Supabase.</p></div></div>
+      </section>
+
+      <section class="route" id="reports">
+        <div class="pagehead"><div><h2>Service Reports</h2><p>View, revise, download, and export historical reports.</p></div><button class="btn primary" data-route="new-report">+ New Report</button></div>
+        <div class="card panel"><div id="reportsList"></div></div>
+      </section>
+
+      <section class="route" id="new-report">
+        <div class="pagehead"><div><h2>New Service Report</h2><p>Select the facility and its active equipment loads automatically.</p></div></div>
+        <div class="report-layout">
+          <div>
+            <div class="card panel formgrid">
+              <label>Customer<select id="reportCustomer"></select></label>
+              <label>Facility<select id="reportFacility"></select></label>
+              <label>Service Technician<input id="technician" value="Joey Petersen"></label>
+              <label>Date<input id="serviceDate" type="date"></label>
+            </div>
+            <div id="reportEquipment"></div>
+            <div class="card panel"><label>Summary & Recommendations<textarea id="summary" rows="5" placeholder="Overall service summary, adjustments, follow-up items, recommendations..."></textarea></label></div>
+          </div>
+          <aside class="card panel snapshot"><h3>Program Snapshot</h3><div id="programStatus" class="program neutral">No Data</div><div class="metric"><span>Points Tested</span><strong id="mTested">0</strong></div><div class="metric"><span>In Range</span><strong id="mGreen">0</strong></div><div class="metric"><span>Slightly Out</span><strong id="mYellow">0</strong></div><div class="metric"><span>Out of Range</span><strong id="mRed">0</strong></div></aside>
+        </div>
+        <div class="actions"><button class="btn" id="saveDraft">Save Draft</button><button class="btn soft" id="addEquipmentReport">+ Equipment</button><button class="btn primary" id="completeReport">Complete & Generate PDF</button></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<nav class="mobile-nav"><button data-route="dashboard">Home</button><button data-route="customers">Customers</button><button class="big" data-route="new-report">+ Report</button><button data-route="reports">Reports</button></nav>
+
+<div class="modal hidden" id="modal"><div class="modalcard"><div class="modalhead"><h3 id="modalTitle">Add Equipment</h3><button id="closeModal">×</button></div><div id="modalBody"></div></div></div>
+<div id="toast" class="toast hidden"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body></html>
