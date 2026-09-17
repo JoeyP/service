@@ -53,3 +53,10 @@ This is v1 of the real app scaffold, not the final app. The next pass should fin
 - OH Alkalinity remains a separate optional reading.
 - Completed PDFs now include populated system tables, targets/statuses, notes, Program Snapshot, Summary & Recommendations, and page footers.
 - Empty reports are blocked from completion.
+
+
+## v2.2 PDF Polish
+- Improved system-level page breaks so equipment sections stay together when practical.
+- Repeats table headings on continuation pages.
+- Uses PDF-safe target notation (`>=`) to prevent the greater-than-or-equal glyph from corrupting in jsPDF core fonts.
+- Shortened footer to preserve clear separation from page numbering.

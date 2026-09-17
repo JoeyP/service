@@ -44,6 +44,7 @@ function collectReport(){
 }
 function reportMetrics(payload){const scored=payload.systems.flatMap(s=>s.readings).filter(x=>x.value!==''&&x.status!=='none');return{tested:scored.length,green:scored.filter(x=>x.status==='green').length,yellow:scored.filter(x=>x.status==='yellow').length,red:scored.filter(x=>x.status==='red').length}}
 function statusText(s){return s==='green'?'In Range':s==='yellow'?'Slightly Out':s==='red'?'Out of Range':'—'}
+function pdfTarget(p){return p[2]==='range'?`${p[3]}-${p[4]}`:p[2]==='min'?`>= ${p[3]}`:p[2]==='max'?`< ${p[4]}`:'—'}
 async function saveReport(status){
   const fid=$('#reportFacility').value,ps=$('#programStatus').textContent,f=facility(fid),c=customer(f.customer_id),payload=collectReport();
   if(!fid)return toast('Choose a facility.');
@@ -53,19 +54,98 @@ async function saveReport(status){
   toast('Supabase save is wired for the next pass after the test schema is connected.')
 }
 function makePDF(r,c,f,payload){
-  const{jsPDF}=window.jspdf,doc=new jsPDF('p','pt','letter'),W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),L=48,R=48;let y=42;
-  const header=first=>{doc.setFillColor(11,47,89);doc.rect(0,0,W,8,'F');doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(11,47,89);doc.text('B & L Neeley, Inc.',L,34);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(88,99,111);doc.text('WATER TECHNOLOGIES  •  CLEANING COMPOUNDS  •  PROCESS SOLUTIONS',L,49);doc.setDrawColor(215,224,233);doc.line(L,59,W-R,59);y=78;if(first){doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(23,34,48);doc.text('SERVICE REPORT',L,y);y+=20;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(95,105,115);doc.text('Water, Boiler & Cooling Systems',L,y);y+=16}};
-  const newPage=()=>{doc.addPage();header(false)},ensure=n=>{if(y+n>H-62)newPage()};
-  header(true);
-  doc.autoTable({startY:y,margin:{left:L,right:R},theme:'plain',body:[['Customer',c.name,'Facility',f.name],['Service Technician',payload.technician||'—','Date',payload.date],['Program Status',payload.program_status,'Report #',String(r.report_number)]],styles:{fontSize:9,cellPadding:5,textColor:[35,45,55]},columnStyles:{0:{fontStyle:'bold',textColor:[11,47,89],cellWidth:92},1:{cellWidth:158},2:{fontStyle:'bold',textColor:[11,47,89],cellWidth:80}}});y=doc.lastAutoTable.finalY+15;
-  const m=reportMetrics(payload);doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(11,47,89);doc.text('Program Snapshot',L,y);y+=8;
-  doc.autoTable({startY:y,margin:{left:L,right:R},theme:'grid',head:[['Points Tested','In Range','Slightly Out','Out of Range']],body:[[m.tested,m.green,m.yellow,m.red]],headStyles:{fillColor:[11,47,89],textColor:255,halign:'center',fontSize:8},bodyStyles:{halign:'center',fontStyle:'bold',fontSize:11,cellPadding:7},styles:{lineColor:[222,229,236],lineWidth:.5}});y=doc.lastAutoTable.finalY+18;
-  payload.systems.forEach(sys=>{const rows=sys.readings.filter(x=>x.value!=='').map(x=>[x.parameter[0],x.value,x.parameter[2]==='none'?'—':target(x.parameter),statusText(x.status)]);if(!rows.length&&!sys.notes)return;ensure(88);doc.setFillColor(11,47,89);doc.roundedRect(L,y,W-L-R,24,4,4,'F');doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(255);doc.text(sys.equipment.name,L+10,y+16);y+=30;
-    if(rows.length){const used=sys.readings.filter(x=>x.value!=='');doc.autoTable({startY:y,margin:{left:L,right:R},theme:'grid',head:[['Parameter','Result','Target','Status']],body:rows,headStyles:{fillColor:[233,239,245],textColor:[11,47,89],fontStyle:'bold',fontSize:8},styles:{fontSize:8.5,cellPadding:5,lineColor:[222,229,236],lineWidth:.5},didParseCell:d=>{if(d.section==='body'&&(d.column.index===1||d.column.index===3)){const s=used[d.row.index].status;d.cell.styles.fillColor=s==='green'?[212,237,218]:s==='yellow'?[255,243,205]:s==='red'?[248,215,218]:[255,255,255]}}});y=doc.lastAutoTable.finalY+9}
-    if(sys.notes){ensure(34);doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(11,47,89);doc.text('Notes',L,y);y+=11;doc.setFont('helvetica','normal');doc.setTextColor(45,55,65);const lines=doc.splitTextToSize(sys.notes,W-L-R);doc.text(lines,L,y);y+=lines.length*10+7}y+=8});
-  if(payload.summary){ensure(58);doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(11,47,89);doc.text('Summary & Recommendations',L,y);y+=14;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(35,45,55);doc.text(doc.splitTextToSize(payload.summary,W-L-R),L,y)}
-  const pages=doc.getNumberOfPages();for(let i=1;i<=pages;i++){doc.setPage(i);doc.setDrawColor(220,226,232);doc.line(L,H-37,W-R,H-37);doc.setFont('helvetica','normal');doc.setFontSize(7.2);doc.setTextColor(110,118,127);doc.text('B & L Neeley, Inc. • Water Technologies & Cleaning Compounds • 209-823-3571 • www.blneeley.com',L,H-22);doc.text(`Page ${i} of ${pages}`,W-R,H-22,{align:'right'})}
-  const safe=s=>String(s).replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'');doc.save(`${safe(c.name)}_${safe(f.name)}_Report_${r.service_date}.pdf`)
+  const{jsPDF}=window.jspdf,doc=new jsPDF('p','pt','letter'),W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),L=48,R=48,contentW=W-L-R;let y=42;
+  const drawHeader=first=>{
+    doc.setFillColor(11,47,89);doc.rect(0,0,W,8,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(11,47,89);doc.text('B & L Neeley, Inc.',L,34);
+    doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(88,99,111);doc.text('WATER TECHNOLOGIES  •  CLEANING COMPOUNDS  •  PROCESS SOLUTIONS',L,49);
+    doc.setDrawColor(215,224,233);doc.line(L,59,W-R,59);y=78;
+    if(first){doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(23,34,48);doc.text('SERVICE REPORT',L,y);y+=20;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(95,105,115);doc.text('Water, Boiler & Cooling Systems',L,y);y+=16}
+  };
+  const newPage=()=>{doc.addPage();drawHeader(false)};
+  const ensure=n=>{if(y+n>H-62)newPage()};
+  drawHeader(true);
+
+  doc.autoTable({startY:y,margin:{left:L,right:R},theme:'plain',
+    body:[['Customer',c.name,'Facility',f.name],['Service Technician',payload.technician||'—','Date',payload.date],['Program Status',payload.program_status,'Report #',String(r.report_number)]],
+    styles:{fontSize:9,cellPadding:5,textColor:[35,45,55]},
+    columnStyles:{0:{fontStyle:'bold',textColor:[11,47,89],cellWidth:92},1:{cellWidth:158},2:{fontStyle:'bold',textColor:[11,47,89],cellWidth:80}}
+  });y=doc.lastAutoTable.finalY+15;
+
+  const m=reportMetrics(payload);
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(11,47,89);doc.text('Program Snapshot',L,y);y+=8;
+  doc.autoTable({startY:y,margin:{left:L,right:R},theme:'grid',head:[['Points Tested','In Range','Slightly Out','Out of Range']],body:[[m.tested,m.green,m.yellow,m.red]],
+    headStyles:{fillColor:[11,47,89],textColor:255,halign:'center',fontSize:8},
+    bodyStyles:{halign:'center',fontStyle:'bold',fontSize:11,cellPadding:7},
+    styles:{lineColor:[222,229,236],lineWidth:.5}
+  });y=doc.lastAutoTable.finalY+18;
+
+  payload.systems.forEach(sys=>{
+    const used=sys.readings.filter(x=>x.value!=='');
+    const rows=used.map(x=>[x.parameter[0],x.value,x.parameter[2]==='none'?'—':pdfTarget(x.parameter),statusText(x.status)]);
+    if(!rows.length&&!sys.notes)return;
+
+    // Estimate the complete system block. If it will fit on a fresh page but not
+    // in the remaining space, move the whole system to the next page.
+    const noteLines=sys.notes?doc.splitTextToSize(sys.notes,contentW):[];
+    const estimated=30+(rows.length?30+rows.length*23:0)+(sys.notes?25+noteLines.length*10:0)+10;
+    const freshCapacity=H-78-62;
+    if(y+estimated>H-62 && estimated<=freshCapacity)newPage();
+    else ensure(70);
+
+    doc.setFillColor(11,47,89);doc.roundedRect(L,y,contentW,24,4,4,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(255);doc.text(sys.equipment.name,L+10,y+16);y+=30;
+
+    if(rows.length){
+      doc.autoTable({startY:y,margin:{left:L,right:R,bottom:62},theme:'grid',
+        head:[['Parameter','Result','Target','Status']],body:rows,
+        headStyles:{fillColor:[233,239,245],textColor:[11,47,89],fontStyle:'bold',fontSize:8},
+        styles:{fontSize:8.5,cellPadding:5,lineColor:[222,229,236],lineWidth:.5},
+        showHead:'everyPage',
+        didDrawPage:data=>{
+          // When AutoTable itself creates a continuation page, add the normal
+          // B&L page header above the continuation table.
+          if(data.pageNumber>1){
+            doc.setFillColor(11,47,89);doc.rect(0,0,W,8,'F');
+            doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(11,47,89);doc.text('B & L Neeley, Inc.',L,34);
+            doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(88,99,111);doc.text('WATER TECHNOLOGIES  •  CLEANING COMPOUNDS  •  PROCESS SOLUTIONS',L,49);
+            doc.setDrawColor(215,224,233);doc.line(L,59,W-R,59);
+          }
+        },
+        didParseCell:d=>{
+          if(d.section==='body'&&(d.column.index===1||d.column.index===3)){
+            const s=used[d.row.index]?.status;
+            d.cell.styles.fillColor=s==='green'?[212,237,218]:s==='yellow'?[255,243,205]:s==='red'?[248,215,218]:[255,255,255]
+          }
+        }
+      });y=doc.lastAutoTable.finalY+9
+    }
+
+    if(sys.notes){
+      const lines=doc.splitTextToSize(sys.notes,contentW);
+      ensure(24+lines.length*10);
+      doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(11,47,89);doc.text('Notes',L,y);y+=11;
+      doc.setFont('helvetica','normal');doc.setTextColor(45,55,65);doc.text(lines,L,y);y+=lines.length*10+7
+    }
+    y+=8
+  });
+
+  if(payload.summary){
+    const lines=doc.splitTextToSize(payload.summary,contentW);
+    ensure(32+lines.length*10);
+    doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(11,47,89);doc.text('Summary & Recommendations',L,y);y+=14;
+    doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(35,45,55);doc.text(lines,L,y)
+  }
+
+  const pages=doc.getNumberOfPages();
+  for(let i=1;i<=pages;i++){
+    doc.setPage(i);doc.setDrawColor(220,226,232);doc.line(L,H-37,W-R,H-37);
+    doc.setFont('helvetica','normal');doc.setFontSize(7.2);doc.setTextColor(110,118,127);
+    doc.text('B & L Neeley, Inc. • Water Technologies & Cleaning Compounds • 209-823-3571',L,H-22);
+    doc.text(`Page ${i} of ${pages}`,W-R,H-22,{align:'right'})
+  }
+  const safe=s=>String(s).replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'');
+  doc.save(`${safe(c.name)}_${safe(f.name)}_Report_${r.service_date}.pdf`)
 }
 function go(id){$$('.route').forEach(x=>x.classList.remove('active'));$('#'+id).classList.add('active');$$('.nav').forEach(x=>x.classList.toggle('active',x.dataset.route===id));const names={'dashboard':['Dashboard','Service program overview'],'customers':['Customers','Customer and facility management'],'reports':['Service Reports','History, revisions, PDFs, and exports'],'new-report':['New Service Report','Field service entry'],'facility':['Facility Setup','Equipment, targets, reports, and trends']};$('#pageTitle').textContent=names[id][0];$('#pageSubtitle').textContent=names[id][1];scrollTo({top:0,behavior:'smooth'})}
 function openModal(title,body){$('#modalTitle').textContent=title;$('#modalBody').innerHTML=body;$('#modal').classList.remove('hidden')}function closeModal(){$('#modal').classList.add('hidden')}function toast(s){$('#toast').textContent=s;$('#toast').classList.remove('hidden');setTimeout(()=>$('#toast').classList.add('hidden'),2500)}
