@@ -44,3 +44,12 @@ This is v1 of the real app scaffold, not the final app. The next pass should fin
 - targets read entirely from Supabase instead of JS defaults
 - trend charts
 - final B&L Neeley letterhead PDF styling
+
+
+## v2 PDF / Boiler Update
+- Fixed dynamic report readings not appearing in generated PDFs.
+- Boiler Alkalinity is automatically calculated as Raw Conductivity minus Neutralized Conductivity.
+- The report labels the calculated result simply as **Alkalinity**.
+- OH Alkalinity remains a separate optional reading.
+- Completed PDFs now include populated system tables, targets/statuses, notes, Program Snapshot, Summary & Recommendations, and page footers.
+- Empty reports are blocked from completion.
