@@ -100,7 +100,25 @@ async function makePDF(r,c,f,payload){
     styles:{lineColor:[222,229,236],lineWidth:.5}
   });y=doc.lastAutoTable.finalY+18;
 
+  const boilerSystems=payload.systems.filter(sys=>sys.equipment.type==='boiler'&&(sys.readings.some(x=>x.value!=='')||sys.notes));
+  if(boilerSystems.length>1){
+    ensure(90);
+    doc.setFillColor(11,47,89);doc.roundedRect(L,y,contentW,24,4,4,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(255);doc.text('Boiler Systems',L+10,y+16);y+=30;
+    const codes=[];boilerSystems.forEach(sys=>sys.readings.forEach(x=>{if(x.value!==''&&!codes.includes(x.parameter[1]))codes.push(x.parameter[1])}));
+    const head=['Parameter',...boilerSystems.map(sys=>sys.equipment.name)];
+    const body=codes.map(code=>{const sample=boilerSystems.flatMap(sys=>sys.readings).find(x=>x.parameter[1]===code);return [sample?.parameter[0]||code,...boilerSystems.map(sys=>sys.readings.find(x=>x.parameter[1]===code)?.value||'—')]});
+    doc.autoTable({startY:y,margin:{left:L,right:R,bottom:62},theme:'grid',head:[head],body,
+      headStyles:{fillColor:[233,239,245],textColor:[11,47,89],fontStyle:'bold',fontSize:7.5,halign:'center'},
+      styles:{fontSize:7.5,cellPadding:4,lineColor:[222,229,236],lineWidth:.5,halign:'center',overflow:'linebreak'},
+      columnStyles:{0:{halign:'left',fontStyle:'bold'}},
+      didParseCell:d=>{if(d.section==='body'&&d.column.index>0){const code=codes[d.row.index],sys=boilerSystems[d.column.index-1],reading=sys?.readings.find(x=>x.parameter[1]===code),st=reading?.status;d.cell.styles.fillColor=st==='green'?[212,237,218]:st==='yellow'?[255,243,205]:st==='red'?[248,215,218]:[255,255,255]}}
+    });y=doc.lastAutoTable.finalY+12;
+    const notes=boilerSystems.filter(sys=>sys.notes);if(notes.length){ensure(28);doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(11,47,89);doc.text('Boiler Notes',L,y);y+=12;notes.forEach(sys=>{const lines=doc.splitTextToSize(sys.equipment.name+': '+sys.notes,contentW);ensure(lines.length*10+5);doc.setFont('helvetica','normal');doc.setTextColor(45,55,65);doc.text(lines,L,y);y+=lines.length*10+5});y+=6}
+  }
+
   payload.systems.forEach(sys=>{
+    if(sys.equipment.type==='boiler'&&boilerSystems.length>1)return;
     const used=sys.readings.filter(x=>x.value!=='');
     const rows=used.map(x=>[x.parameter[0],x.value,x.parameter[2]==='none'?'—':pdfTarget(x.parameter),statusText(x.status)]);
     if(!rows.length&&!sys.notes)return;
