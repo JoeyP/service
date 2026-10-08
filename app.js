@@ -10,7 +10,7 @@ function target(p){return p[2]==='range'?`${p[3]}–${p[4]}`:p[2]==='min'?`≥${
 function classify(p,v){if(v===''||p[2]==='none')return'none';v=+v;const wmin=p[6],wmax=p[7];if(p[2]==='range')return v>=p[3]&&v<=p[4]?'green':((wmin!=null&&v>=wmin&&v<p[3])||(wmax!=null&&v>p[4]&&v<=wmax))?'yellow':'red';if(p[2]==='min')return v>=p[3]?'green':wmin!=null&&v>=wmin?'yellow':'red';if(p[2]==='max')return v<=p[4]?'green':wmax!=null&&v<=wmax?'yellow':'red';return'none'}
 function facility(id){return state.facilities.find(x=>x.id===id)}function customer(id){return state.customers.find(x=>x.id===id)}function icon(t){return t==='boiler'?'B':t==='cooling_tower'?'CT':t==='closed_loop'?'CL':'W'}
 function equipmentSort(a,b){const ta=state.equipmentTypes.find(x=>x.code===a.type),tb=state.equipmentTypes.find(x=>x.code===b.type);return (ta?.sort_order??90)-(tb?.sort_order??90)||(a.sort_order??0)-(b.sort_order??0)||a.name.localeCompare(b.name)}
-function rowReport(r){const f=facility(r.facility_id),c=customer(f.customer_id),cl=r.program_status==='Stable'?'green':r.program_status==='Watch'?'yellow':r.program_status?'red':'gray';return`<div class="rowcard"><div class="rowtop"><div><h4>${esc(c.name)} — ${esc(f.name)}</h4><div class="meta">${r.service_date} · Report #${r.report_number}</div></div><span class="badge ${cl}">${esc(r.program_status||r.status)}</span></div></div>`}
+function rowReport(r){const f=facility(r.facility_id),c=customer(f.customer_id),cl=r.program_status==='Stable'?'green':r.program_status==='Watch'?'yellow':r.program_status?'red':'gray';return`<div class="rowcard"><div class="rowtop"><div><h4>${esc(c.name)} — ${esc(f.name)}</h4><div class="meta">${r.service_date}</div></div><span class="badge ${cl}">${esc(r.program_status||r.status)}</span></div></div>`}
 function render(){renderDashboard();renderCustomers();renderFacility();renderReports();populateReport();if(state.profile?.role==='admin')renderUsers()}
 function renderDashboard(){const now=new Date(),month=now.toISOString().slice(0,7),monthReports=state.reports.filter(r=>String(r.service_date||'').startsWith(month)),completed=monthReports.filter(r=>r.status!=='draft'),stable=completed.filter(r=>r.program_status==='Stable');$('#kpiFacilities').textContent=state.facilities.length;$('#kpiReports').textContent=monthReports.length;$('#kpiStable').textContent=completed.length?Math.round(stable.length/completed.length*100)+'%':'—';$('#kpiDrafts').textContent=state.reports.filter(r=>r.status==='draft').length;$('#recentReports').innerHTML=state.reports.length?state.reports.slice(0,5).map(rowReport).join(''):'<div class="empty-state">No service reports yet.</div>';$('#recentEquipment').innerHTML=state.equipment.length?state.equipment.slice(-5).reverse().map(e=>`<div class="rowcard"><strong>${esc(e.name)}</strong><div class="meta">${esc(facility(e.facility_id)?.name||'')} · ${e.equipment_class}</div></div>`).join(''):'<div class="empty-state">No equipment has been added yet.</div>'}
 function renderCustomers(){const q=$('#customerSearch').value.toLowerCase();const matches=state.customers.filter(c=>c.name.toLowerCase().includes(q)||state.facilities.some(f=>f.customer_id===c.id&&((f.name||'')+' '+(f.city||'')).toLowerCase().includes(q)));$('#customerList').innerHTML=matches.length?matches.map(c=>{const fs=state.facilities.filter(f=>f.customer_id===c.id),n=state.equipment.filter(e=>fs.some(f=>f.id===e.facility_id)).length;return`<div class="rowcard customer-block"><div class="rowtop"><div><h4>${esc(c.name)}</h4><div class="meta">${fs.length} facilit${fs.length===1?'y':'ies'} · ${n} active systems</div></div><button class="btn soft add-facility" data-cid="${c.id}">+ Facility</button></div><div class="facility-list">${fs.length?fs.map(f=>`<button class="facility-row" data-fid="${f.id}"><span><strong>${esc(f.name)}</strong><small>${esc([f.city,f.state].filter(Boolean).join(', ')||'No address entered')}</small></span><span>Open ›</span></button>`).join(''):'<div class="meta" style="padding-top:12px">No facilities yet.</div>'}</div></div>`}).join(''):'<div class="empty-state">No customers or facilities found.</div>';$$('.add-facility').forEach(x=>x.onclick=e=>{e.stopPropagation();openFacilityModal(x.dataset.cid)});$$('.facility-row').forEach(x=>x.onclick=()=>{state.facilityId=x.dataset.fid;renderFacility();go('facility')})}
@@ -44,7 +44,7 @@ function updateSnapshot(){
 function collectReport(){
   updateSnapshot();
   const systems=$$('#reportEquipment .system').map(s=>{const e=state.equipment.find(x=>x.id===s.dataset.eid),ps=paramsForEquipment(e);return{equipment:e,notes:$('textarea',s)?.value.trim()||'',readings:$$('input[data-pindex]',s).map(i=>{const p=ps[+i.dataset.pindex];return{parameter:p,value:i.value.trim(),status:classify(p,i.value)}})}});
-  return{technician:$('#technician').value.trim(),date:$('#serviceDate').value,summary:$('#summary').value.trim(),program_status:$('#programStatus').textContent,systems}
+  return{technician:state.profile?.display_name||state.user?.email||'',date:$('#serviceDate').value,summary:$('#summary').value.trim(),program_status:$('#programStatus').textContent,systems}
 }
 function reportMetrics(payload){const scored=payload.systems.flatMap(s=>s.readings).filter(x=>x.value!==''&&x.status!=='none');return{tested:scored.length,green:scored.filter(x=>x.status==='green').length,yellow:scored.filter(x=>x.status==='yellow').length,red:scored.filter(x=>x.status==='red').length}}
 function statusText(s){return s==='green'?'In Range':s==='yellow'?'Slightly Out':s==='red'?'Out of Range':'—'}
@@ -83,14 +83,14 @@ async function makePDF(r,c,f,payload){
       doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(88,99,111);doc.text('WATER TECHNOLOGIES  •  CLEANING COMPOUNDS  •  PROCESS SOLUTIONS',L,49);
       doc.setDrawColor(215,224,233);doc.line(L,59,W-R,59);y=78;
     }
-    if(first){doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(23,34,48);doc.text('SERVICE REPORT',L,y);y+=20;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(95,105,115);doc.text('Water, Boiler & Cooling Systems',L,y);y+=16}
+    if(first){doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(23,34,48);doc.text('SERVICE REPORT',L,y);y+=24}
   };
-  const newPage=()=>{doc.addPage();drawHeader(false)};
+  const newPage=()=>{doc.addPage();y=42};
   const ensure=n=>{if(y+n>H-62)newPage()};
   drawHeader(true);
 
   doc.autoTable({startY:y,margin:{left:L,right:R},theme:'plain',
-    body:[['Customer',c.name,'Facility',f.name],['Service Technician',payload.technician||'—','Date',payload.date],['Program Status',payload.program_status,'Report #',String(r.report_number)]],
+    body:[['Customer',c.name,'Facility',f.name],['Service Technician',payload.technician||'—','Date',payload.date],['Program Status',payload.program_status,'','']],
     styles:{fontSize:9,cellPadding:5,textColor:[35,45,55]},
     columnStyles:{0:{fontStyle:'bold',textColor:[11,47,89],cellWidth:92},1:{cellWidth:158},2:{fontStyle:'bold',textColor:[11,47,89],cellWidth:80}}
   });y=doc.lastAutoTable.finalY+15;
