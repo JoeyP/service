@@ -50,16 +50,24 @@ async function saveReport(status){
   if(!fid)return toast('Choose a facility.');
   const entered=payload.systems.some(s=>s.notes||s.readings.some(x=>x.value!==''))||payload.summary;
   if(status==='completed'&&!entered)return toast('Enter at least one reading or note before completing the report.');
-  if(DEMO){const r={id:'r'+Date.now(),report_number:Math.max(...state.reports.map(x=>x.report_number))+1,facility_id:fid,service_date:payload.date,status,program_status:ps==='No Data'?null:ps};state.reports.unshift(r);if(status==='completed')makePDF(r,c,f,payload);render();toast(status==='completed'?'Report completed.':'Draft saved.');return}
+  if(DEMO){const r={id:'r'+Date.now(),report_number:Math.max(...state.reports.map(x=>x.report_number))+1,facility_id:fid,service_date:payload.date,status,program_status:ps==='No Data'?null:ps};state.reports.unshift(r);if(status==='completed')await makePDF(r,c,f,payload);render();toast(status==='completed'?'Report completed.':'Draft saved.');return}
   toast('Supabase save is wired for the next pass after the test schema is connected.')
 }
-function makePDF(r,c,f,payload){
+async function loadPdfHeader(){return new Promise(resolve=>{const img=new Image();img.onload=()=>{try{const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;canvas.getContext('2d').drawImage(img,0,0);resolve({data:canvas.toDataURL('image/png'),width:img.naturalWidth,height:img.naturalHeight})}catch(e){resolve(null)}};img.onerror=()=>resolve(null);img.src='Header%202025.png?v=20261008-2'})}
+async function makePDF(r,c,f,payload){
   const{jsPDF}=window.jspdf,doc=new jsPDF('p','pt','letter'),W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),L=48,R=48,contentW=W-L-R;let y=42;
+  const headerAsset=await loadPdfHeader();
   const drawHeader=first=>{
-    doc.setFillColor(11,47,89);doc.rect(0,0,W,8,'F');
-    doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(11,47,89);doc.text('B & L Neeley, Inc.',L,34);
-    doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(88,99,111);doc.text('WATER TECHNOLOGIES  •  CLEANING COMPOUNDS  •  PROCESS SOLUTIONS',L,49);
-    doc.setDrawColor(215,224,233);doc.line(L,59,W-R,59);y=78;
+    if(headerAsset){
+      const maxW=W-48,scaledH=maxW*(headerAsset.height/headerAsset.width);
+      doc.addImage(headerAsset.data,'PNG',24,18,maxW,scaledH,undefined,'FAST');
+      y=18+scaledH+18;
+    }else{
+      doc.setFillColor(11,47,89);doc.rect(0,0,W,8,'F');
+      doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(11,47,89);doc.text('B & L Neeley, Inc.',L,34);
+      doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(88,99,111);doc.text('WATER TECHNOLOGIES  •  CLEANING COMPOUNDS  •  PROCESS SOLUTIONS',L,49);
+      doc.setDrawColor(215,224,233);doc.line(L,59,W-R,59);y=78;
+    }
     if(first){doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(23,34,48);doc.text('SERVICE REPORT',L,y);y+=20;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(95,105,115);doc.text('Water, Boiler & Cooling Systems',L,y);y+=16}
   };
   const newPage=()=>{doc.addPage();drawHeader(false)};
@@ -105,11 +113,9 @@ function makePDF(r,c,f,payload){
         didDrawPage:data=>{
           // When AutoTable itself creates a continuation page, add the normal
           // B&L page header above the continuation table.
-          if(data.pageNumber>1){
-            doc.setFillColor(11,47,89);doc.rect(0,0,W,8,'F');
-            doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(11,47,89);doc.text('B & L Neeley, Inc.',L,34);
-            doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(88,99,111);doc.text('WATER TECHNOLOGIES  •  CLEANING COMPOUNDS  •  PROCESS SOLUTIONS',L,49);
-            doc.setDrawColor(215,224,233);doc.line(L,59,W-R,59);
+          if(data.pageNumber>1&&headerAsset){
+            const maxW=W-48,scaledH=maxW*(headerAsset.height/headerAsset.width);
+            doc.addImage(headerAsset.data,'PNG',24,18,maxW,scaledH,undefined,'FAST');
           }
         },
         didParseCell:d=>{
