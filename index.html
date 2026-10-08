@@ -33,10 +33,10 @@
       <section class="route active" id="dashboard">
         <div class="pagehead"><div><h2>Service Dashboard</h2><p>Customer programs, recent visits, and current facility activity.</p></div></div>
         <div class="kpis">
-          <div class="card kpi"><span>Active Facilities</span><strong id="kpiFacilities">3</strong></div>
-          <div class="card kpi"><span>Reports This Month</span><strong id="kpiReports">3</strong></div>
-          <div class="card kpi"><span>Stable Programs</span><strong id="kpiStable">67%</strong></div>
-          <div class="card kpi"><span>Open Drafts</span><strong id="kpiDrafts">1</strong></div>
+          <div class="card kpi"><span>Active Facilities</span><strong id="kpiFacilities">0</strong></div>
+          <div class="card kpi"><span>Reports This Month</span><strong id="kpiReports">0</strong></div>
+          <div class="card kpi"><span>Stable Programs</span><strong id="kpiStable">—</strong></div>
+          <div class="card kpi"><span>Open Drafts</span><strong id="kpiDrafts">0</strong></div>
         </div>
         <div class="split">
           <div class="card panel"><div class="panelhead"><h3>Recent Reports</h3><button class="link" data-route="reports">View all</button></div><div id="recentReports"></div></div>
@@ -50,7 +50,7 @@
       </section>
 
       <section class="route" id="facility">
-        <div class="pagehead"><div><h2 id="facilityTitle">Nulaid — Ripon</h2><p id="facilityMeta">Facility equipment and program setup.</p></div><button class="btn primary" id="addEquipment">+ Add Equipment</button></div>
+        <div class="pagehead"><div><h2 id="facilityTitle">Facility Setup</h2><p id="facilityMeta">Facility equipment and program setup.</p></div><button class="btn primary" id="addEquipment">+ Add Equipment</button></div>
         <div class="tabs"><button class="tab active" data-tab="equipmentTab">Equipment</button><button class="tab" data-tab="targetsTab">Targets</button><button class="tab" data-tab="facilityReportsTab">Reports</button><button class="tab" data-tab="trendsTab">Trends</button></div>
         <div class="tabpane active" id="equipmentTab"><div id="equipmentGrid" class="equipment-grid"></div></div>
         <div class="tabpane" id="targetsTab"><div class="card panel"><h3>Target Profiles</h3><div id="targetsList"></div></div></div>
@@ -75,7 +75,7 @@
             <div class="card panel formgrid">
               <label>Customer<select id="reportCustomer"></select></label>
               <label>Facility<select id="reportFacility"></select></label>
-              <label>Service Technician<input id="technician" value="Joey Petersen"></label>
+              <label>Service Technician<input id="technician"></label>
               <label>Date<input id="serviceDate" type="date"></label>
             </div>
             <div id="reportEquipment"></div>
@@ -97,5 +97,5 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=20261008-9"></script>
+<script src="app.js?v=20261008-10"></script>
 </body></html>
